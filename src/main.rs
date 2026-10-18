@@ -1,10 +1,11 @@
 use gtk::prelude::*;
 use gtk::{
-    gdk, glib, Application, ApplicationWindow, Box as GtkBox, CssProvider, HeaderBar, Label,
-    Orientation, Revealer, SearchEntry, Stack, StackSidebar, ToggleButton,
+    gdk, glib, Application, ApplicationWindow, Box as GtkBox, CssProvider, Image, Label,
+    Orientation, Stack,
 };
 use webkit6::prelude::*;
 use webkit6::WebView;
+mod ui;
 
 const APP_ID: &str = "org.example.GtkSidebar";
 
@@ -42,12 +43,33 @@ fn page(text: &str) -> Label {
         .build()
 }
 
-const PAGES: &[(&str, &str, &str)] = &[
-    ("home ", "Home", "https://hypr.land/news/26_lua/"),
-    ("dashboard ", "Dashboard", "https://hypr.land/news/26_lua/"),
-    ("library ", "Library", "https://hypr.land/news/26_lua/"),
-    ("settings ", "Settings", "https://hypr.land/news/26_lua/"),
+const PAGES: &[(&str, &str, &str, &str)] = &[
+    (
+        "home ",
+        "Home",
+        "go-home-symbolic",
+        "https://hypr.land/news/26_lua/",
+    ),
+    (
+        "dashboard",
+        "Dashboard",
+        "view-grid-symbolic",
+        "https://hypr.land/news/26_lua/",
+    ),
+    (
+        "library ",
+        "Library",
+        "folder-symbolic",
+        "https://hypr.land/news/26_lua/",
+    ),
+    (
+        "settings ",
+        "Settings",
+        "preferences-system-symbolic",
+        "https://hypr.land/news/26_lua/",
+    ),
 ];
+
 fn new_webview() -> WebView {
     let webview = WebView::new();
     enable_inspector(&webview);
@@ -72,21 +94,53 @@ fn build_ui(app: &Application) {
         };
         if let Ok(webview) = child.downcast::<WebView>() {
             if webview.uri().is_none() {
-                if let Some((_, _, url)) = PAGES.iter().find(|(id, _, _)| *id == name.as_str()) {
+                if let Some((_, _, _, url)) =
+                    PAGES.iter().find(|(id, _, _, _)| *id == name.as_str())
+                {
                     webview.load_uri(url);
                 }
             }
         }
     });
-    for (id, title, _) in PAGES {
+
+    //custom sidebar instead of StackSidebar
+    let list = ListBox::new();
+    list.set_selection_mode(gtk::SelectionMode::Single);
+    list.add_css_class("navigation-sidebar");
+
+    for (id, _icon, title, _) in PAGES {
         stack.add_titled(&new_webview(), Some(id), title);
     }
-    // 2. The StackSidebar is a ready-made list that controls the Stack.
-    let sidebar = StackSidebar::new();
-    sidebar.set_stack(&stack);
-    sidebar.set_width_request(200);
+    let sidebar = ListBox::builder()
+        .selection_mode(gtk::SelectionMode::Single)
+        .css_classes(["navigation-sidebar"])
+        .width_request(200)
+        .build();
 
-    // 3. Revealer wraps the sidebar so it can slide in and out.
+    for (_, title, icon, _) in PAGES {
+        let row = GtkBox::new(Orientation::Horizontal, 12);
+        row.set_margin_top(8);
+        row.set_margin_bottom(8);
+        row.set_margin_start(8);
+        row.append(&Image::from_icon_name(icon));
+        row.append(&Label::new(Some(title)));
+        sidebar.append(&row);
+    }
+
+    // Clicking a row shows the matching stack page.
+    sidebar.connect_row_selected({
+        let stack = stack.clone();
+        move |_, row| {
+            if let Some(row) = row {
+                if let Some((id, ..)) = PAGES.get(row.index() as usize) {
+                    stack.set_visible_child_name(id);
+                }
+            }
+        }
+    });
+
+    // Start with the first row highlighted.
+    sidebar.select_row(sidebar.row_at_index(0).as_ref()); // 3. Revealer wraps the sidebar so it can slide in and out.
     let revealer = Revealer::builder()
         .transition_type(gtk::RevealerTransitionType::SlideRight)
         .transition_duration(250)
