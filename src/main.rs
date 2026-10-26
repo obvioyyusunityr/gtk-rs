@@ -2,7 +2,6 @@
 use gtk::glib;
 use gtk::prelude::*;
 
-//mod custom_window;
 mod ui;
 
 const APP_ID: &str = "org.example.GtkSidebar";
