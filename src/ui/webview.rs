@@ -1,12 +1,22 @@
 //src/ui/webview.rs
-use gtk::gio;
 use gtk::prelude::*;
 use gtk::Stack;
+use gtk::{gio, glib};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use webkit6::prelude::*;
 use webkit6::WebView;
-use webkit6::{UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
+
+fn to_uri(s: &str) -> String {
+    if s.contains("://") {
+        return s.to_string();
+    }
+    let path = match s.strip_prefix("~/") {
+        Some(rest) => glib::home_dir().join(rest),
+        None => std::path::PathBuf::from(s),
+    };
+    gio::File::for_path(path).uri().to_string()
+}
 
 /// Create a WebView that fills its parent, with the inspector enabled.
 pub fn build(url: &'static str) -> WebView {
@@ -18,7 +28,7 @@ pub fn build(url: &'static str) -> WebView {
     let loaded = Cell::new(false);
     webview.connect_map(move |webview| {
         if !loaded.replace(true) {
-            webview.load_uri(url);
+            webview.load_uri(&to_uri(url));
         }
     });
 
@@ -31,20 +41,15 @@ pub fn build(url: &'static str) -> WebView {
     webview
 }
 
-const DARK_CSS: &str = "
-html {filter: invert(1) hue-rotate(180deg); background: #fff;}
-img, video,canvas,picture {filter: invert(1) hue-rotate(180deg);}
-";
-
 static DARK: AtomicBool = AtomicBool::new(false);
 // Page
 const DARK_JS: &str = r#"
 (function (on) {
   const old = document.getElementById('__dark_override');
-  if (old) old.remove();                 // remove first so we measure the page's real colors
+  if (old) old.remove();
+  document.querySelectorAll('[data-dark-skip]').forEach(e => e.removeAttribute('data-dark-skip'));
   if (!on || !document.head) return;
 
-  // Perceived brightness (0..1) of a CSS color string, or null if transparent.
   function lum(color) {
     const m = color.match(/[\d.]+/g);
     if (!m) return null;
@@ -54,25 +59,32 @@ const DARK_JS: &str = r#"
   }
 
   function pageIsDark() {
-    // 1. Background of body, then html.
     for (const el of [document.body, document.documentElement]) {
       if (!el) continue;
       const l = lum(getComputedStyle(el).backgroundColor);
       if (l !== null) return l < 0.5;
     }
-    // 2. Both transparent: the browser paints white, unless the text is light,
-    //    which means the page expects a dark canvas.
     const t = document.body && lum(getComputedStyle(document.body).color);
     return t !== null && t !== undefined && t > 0.7;
   }
 
-  if (pageIsDark()) return;              // already dark, leave it alone
+  if (pageIsDark()) return;
+
+  // Mark small images so they follow the page instead of being re-inverted.
+  document.querySelectorAll('img').forEach(img => {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (w <= 120 || h <= 120) img.setAttribute('data-dark-skip', '');
+  });
 
   const s = document.createElement('style');
   s.id = '__dark_override';
   s.textContent = `
     html { filter: invert(1) hue-rotate(180deg); background: #fff; }
-    img, video, canvas, picture { filter: invert(1) hue-rotate(180deg); }
+    img:not([data-dark-skip]), video, canvas, iframe, embed, object,
+    [style*="background-image"], [style*="background: url"] {
+      filter: invert(1) hue-rotate(180deg);
+    }
   `;
   document.head.appendChild(s);
 })(ON_PLACEHOLDER);

@@ -43,11 +43,11 @@ pub const PAGES: &[Page] = &[
         id: "orders",
         title: "Orders",
         icon: "view-list-symbolic",
-        url: "https://google.com",
+        url: "http://127.0.0.1/",
     },
     Page {
-        id: "crm",
-        title: "CRM ",
+        id: "business",
+        title: "Business",
         icon: "system-users-symbolic",
         url: "http://127.0.0.1/",
     },
@@ -80,9 +80,21 @@ pub const PAGES: &[Page] = &[
         url: "http://127.0.0.1/",
     },
     Page {
+        id: "help",
+        title: "Help",
+        icon: "help-faq-symbolic",
+        url: "https://google.com",
+    },
+    Page {
         id: "settings",
         title: "Settings",
         icon: "applications-system-symbolic",
+        url: "https://hypr.land/news/26_lua/",
+    },
+    Page {
+        id: "trash",
+        title: "Trash",
+        icon: "user-trash-symbolic",
         url: "https://hypr.land/news/26_lua/",
     },
 ];

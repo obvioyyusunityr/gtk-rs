@@ -1,5 +1,7 @@
 //src/ui/header.rs
+use super::accounts::Accounts;
 use super::notifications::Notifications;
+use super::state::Shared;
 use gtk::prelude::*;
 use gtk::{
     Box as GtkBox, Button, HeaderBar, Orientation, Revealer, SearchEntry, Stack, ToggleButton,
@@ -16,12 +18,13 @@ pub struct Header {
     pub search: SearchEntry,
     pub notifications: Notifications,
     pub toggle: ToggleButton,
+    pub accounts: Accounts,
 }
 // ...
 
 /// Build the header bar: sidebar toggle, back/forward buttons, and a
 /// search entry in the title area.
-pub fn build(revealer: &Revealer, stack: &Stack) -> Header {
+pub fn build(revealer: &Revealer, stack: &Stack, state: &Shared) -> Header {
     // Sidebar toggle, bound directly to the revealer's state.
     let toggle = ToggleButton::builder()
         .icon_name("sidebar-show-symbolic")
@@ -95,6 +98,7 @@ pub fn build(revealer: &Revealer, stack: &Stack) -> Header {
         .placeholder_text("Search")
         .width_request(300)
         .build();
+
     search.connect_search_changed(|entry| {
         let query = entry.text();
         println!("searching for: {query}");
@@ -102,17 +106,35 @@ pub fn build(revealer: &Revealer, stack: &Stack) -> Header {
 
     let notifications = Notifications::new();
 
+    let accounts = Accounts::new(state, {
+        let notifications = notifications.clone();
+        move |acc| match acc {
+            Some(name) => notifications.push(&format!("Switched to {name}")),
+            None => notifications.push("Signed out"),
+        }
+    });
+
     let bar = HeaderBar::new();
     bar.pack_start(&toggle);
     bar.pack_start(&nav);
     bar.pack_end(&menu::build());
+    bar.pack_end(&accounts.button);
     bar.pack_end(&notifications.button);
-    bar.set_title_widget(Some(&search));
+    //bar.set_title_widget(Some(&search));
+
+    let clamp = adw::Clamp::builder()
+        .maximum_size(300)
+        .tightening_threshold(200)
+        .hexpand(true)
+        .child(&search)
+        .build();
+    bar.set_title_widget(Some(&clamp));
 
     Header {
         bar,
         search,
         notifications,
         toggle,
+        accounts,
     }
 }

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
 pub type Shared = Rc<RefCell<State>>;
-
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)] // missing fields (older files) fall back to defaults
 pub struct State {
@@ -15,6 +14,8 @@ pub struct State {
     pub dark: Option<bool>, // None = follow the system
     pub devtools: bool,
     pub zoom: f64,
+    pub accounts: Vec<String>,
+    pub account: Option<String>,
 }
 
 impl Default for State {
@@ -28,6 +29,8 @@ impl Default for State {
             dark: None,
             devtools: true,
             zoom: 1.0,
+            accounts: Vec::new(),
+            account: None,
         }
     }
 }

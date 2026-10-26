@@ -1,4 +1,5 @@
 //src/ui/mod.rs
+pub mod accounts;
 mod header;
 mod menu;
 mod notifications;

@@ -18,7 +18,7 @@ pub fn build(stack: &Stack) -> Revealer {
         .margin_top(14)
         .margin_bottom(10)
         .margin_start(12)
-        .css_classes(["title-3"])
+        .css_classes(["app-title"])
         .build();
 
     let list = ListBox::builder()
@@ -29,6 +29,7 @@ pub fn build(stack: &Stack) -> Revealer {
         .build();
 
     let column = GtkBox::new(Orientation::Vertical, 0);
+    column.add_css_class("sidebar-col");
     column.set_width_request(200);
     column.append(&title);
     column.append(&list);

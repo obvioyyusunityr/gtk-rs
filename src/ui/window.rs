@@ -12,9 +12,10 @@ pub fn build(app: &Application) {
     let state = state::load();
     let stack = pages::build(&state);
     let revealer = sidebar::build(&stack);
-    let header = header::build(&revealer, &stack);
+    let header = header::build(&revealer, &stack, &state);
     header.notifications.push("Welcome to Duck Finance");
     header.notifications.push("Welcome to Duck Finance");
+    header.accounts.button.set_tooltip_text(Some("Accounts"));
 
     let (w, h, maximized, sidebar, page) = {
         let s = state.borrow();
@@ -27,10 +28,17 @@ pub fn build(app: &Application) {
         )
     };
 
+    let card = GtkBox::new(Orientation::Horizontal, 0);
+    card.add_css_class("content-card");
+    card.set_overflow(gtk::Overflow::Hidden);
+    card.set_hexpand(true);
+    card.append(&stack);
+
     let content = GtkBox::new(Orientation::Horizontal, 0);
+    content.add_css_class("app-bg");
     content.append(&revealer);
-    content.append(&Separator::new(Orientation::Vertical));
-    content.append(&stack);
+    //content.append(&Separator::new(Orientation::Vertical));
+    content.append(&card);
 
     let window = ApplicationWindow::builder()
         .application(app)
@@ -64,6 +72,25 @@ pub fn build(app: &Application) {
             glib::Propagation::Proceed
         }
     });
+    let manager = adw::StyleManager::default();
+    let apply = {
+        let window = window.clone();
+        move |m: &adw::StyleManager| {
+            if m.is_dark() {
+                window.add_css_class("dark");
+            } else {
+                window.remove_css_class("dark");
+            }
+        }
+    };
+
+    apply(&manager);
+    println!(
+        "dark={} classes={:?}",
+        manager.is_dark(),
+        window.css_classes()
+    );
+    manager.connect_dark_notify(move |m| apply(m));
 
     menu::install_actions(app, &window, &stack);
 
