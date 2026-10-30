@@ -116,12 +116,26 @@ pub fn build(state: &Shared) -> Stack {
         }
         stack.add_titled(&webview::build(page.url), Some(page.id), page.title);
     }
-
     stack.add_titled(
         &settings::build(&stack, state),
         Some("settings"),
         "Settings",
     );
+
+    stack.connect_visible_child_notify(|stack| {
+        let Some(name) = stack.visible_child_name() else {
+            return;
+        };
+        let Some(page) = PAGES.iter().find(|p| p.id == name.as_str()) else {
+            return;
+        };
+        let Some(child) = stack.child_by_name(page.id) else {
+            return;
+        };
+        if child.is::<WebView>() || page.id == "settings" {
+            return;
+        }
+    });
     stack
 }
 

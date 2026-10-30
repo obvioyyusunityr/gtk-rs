@@ -9,6 +9,7 @@ use super::webview;
 pub fn build() -> MenuButton {
     let menu = gio::Menu::new();
     menu.append(Some("Reload Page"), Some("app.reload"));
+    menu.append(Some("Toggle Header"), Some("app.toggle-header"));
     menu.append(Some("Preferences"), Some("app.preferences"));
 
     let section = gio::Menu::new();
@@ -24,6 +25,19 @@ pub fn build() -> MenuButton {
 
 /// Register the actions the menu items point at, plus keyboard shortcuts.
 pub fn install_actions(app: &Application, window: &ApplicationWindow, stack: &Stack) {
+    let toggle_header = gio::ActionEntry::builder("toggle-header")
+        .activate({
+            let window = window.clone();
+            move |_app: &Application, _, _| {
+                if let Some(bar) = window.titlebar() {
+                    bar.set_visible(!bar.is_visible());
+                }
+            }
+        })
+        .build();
+
+    app.set_accels_for_action("app.toggle-header", &["<Ctrl><Shift>h", "F10"]);
+
     // Reload whichever page is currently visible.
     let reload = gio::ActionEntry::builder("reload")
         .activate({
@@ -65,7 +79,8 @@ pub fn install_actions(app: &Application, window: &ApplicationWindow, stack: &St
         })
         .build();
 
-    app.add_action_entries([reload, preferences, about, quit]);
+    app.add_action_entries([reload, preferences, about, quit, toggle_header]);
+    //app.add_action_entries([reload, preferences, about, quit]);
     app.set_accels_for_action("app.reload", &["<Ctrl>r"]);
     app.set_accels_for_action("app.quit", &["<Alt>q"]);
 }

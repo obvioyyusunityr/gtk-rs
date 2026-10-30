@@ -10,6 +10,7 @@ pub struct State {
     pub height: i32,
     pub maximized: bool,
     pub sidebar_visible: bool,
+    pub header_visible: bool,
     pub page: String,
     pub dark: Option<bool>, // None = follow the system
     pub devtools: bool,
@@ -21,6 +22,7 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
+            header_visible: true,
             width: 800,
             height: 500,
             maximized: false,
