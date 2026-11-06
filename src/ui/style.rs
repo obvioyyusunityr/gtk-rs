@@ -4,6 +4,10 @@ use gtk::{gdk, CssProvider};
 const CSS: &str = "
     button.sidebar-toggle:checked { background: #3584e4; color: white; }
     button.sidebar-toggle:active  { background: #1c71d8; color: white; }
+.sidebar-col separator {
+    background: #333333;
+    min-height: 1px;
+}
 .notif-badge {
     background: #e01b24;
     color: white;

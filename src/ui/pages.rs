@@ -11,11 +11,21 @@ use webkit6::WebView;
 
 use super::webview;
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum Group {
+    Top,
+    Overview,
+    Work,
+    Footer,
+}
+
 pub struct Page {
     pub id: &'static str,
     pub title: &'static str,
     pub icon: &'static str,
     pub url: &'static str,
+    pub group: Group,
+    pub parent: Option<&'static str>,
 }
 
 /// Single source of truth: the sidebar rows and the stack pages are both
@@ -26,36 +36,65 @@ pub const PAGES: &[Page] = &[
         title: "Home",
         icon: "go-home-symbolic",
         url: "https://google.com",
+        group: Group::Top,
+        parent: None,
     },
     Page {
         id: "search",
         title: "Search",
         icon: "system-search-symbolic",
         url: "http://127.0.0.1/",
+        group: Group::Top,
+        parent: None,
     },
     Page {
         id: "dashboard",
         title: "Dashboard",
         icon: "view-grid-symbolic",
         url: "https://hypr.land/news/26_lua/",
+        group: Group::Overview,
+        parent: None,
+    },
+    Page {
+        id: "news",
+        title: "News",
+        icon: "view-paged-symbolic",
+        url: "http://127.0.0.1/",
+        group: Group::Overview,
+        parent: None,
+    },
+    Page {
+        id: "inbox",
+        title: "Inbox",
+        icon: "mail-unread-symbolic",
+        //icon: "mail-message-new-symbolic",
+        url: "http://127.0.0.1/",
+        group: Group::Overview,
+        parent: None,
     },
     Page {
         id: "orders",
         title: "Orders",
         icon: "view-list-symbolic",
         url: "http://127.0.0.1/",
+        group: Group::Work,
+        parent: None,
     },
     Page {
         id: "business",
         title: "Business",
         icon: "system-users-symbolic",
         url: "http://127.0.0.1/",
+        group: Group::Work,
+        parent: None,
     },
     Page {
         id: "assets",
         title: "Assets ",
         icon: "package-x-generic-symbolic",
         url: "http://127.0.0.1/",
+        group: Group::Work,
+        parent: None,
     },
     Page {
         id: "invoice",
@@ -65,37 +104,50 @@ pub const PAGES: &[Page] = &[
         //icon: "text-x-generic-symbolic", // plain text page
         //icon: "emblem-documents-symbolic", // documents emblem
         url: "http://127.0.0.1/",
+        group: Group::Work,
+        parent: None,
     },
     Page {
         id: "library",
         title: "Library",
         icon: "folder-symbolic",
         url: "https://hypr.land/news/26_lua/",
-    },
-    Page {
-        id: "inbox",
-        title: "Inbox",
-        icon: "mail-unread-symbolic",
-        //icon: "mail-message-new-symbolic",
-        url: "http://127.0.0.1/",
+        group: Group::Work,
+        parent: None,
     },
     Page {
         id: "help",
         title: "Help",
         icon: "help-faq-symbolic",
         url: "https://google.com",
-    },
-    Page {
-        id: "settings",
-        title: "Settings",
-        icon: "applications-system-symbolic",
-        url: "https://hypr.land/news/26_lua/",
+        group: Group::Footer,
+        parent: None,
     },
     Page {
         id: "trash",
         title: "Trash",
         icon: "user-trash-symbolic",
         url: "https://hypr.land/news/26_lua/",
+        group: Group::Footer,
+        parent: None,
+    },
+    Page {
+        id: "riders",
+        title: "Riders",
+        //icon: "send-to-symbolic",
+        //icon: "mark-location-symbolic",
+        icon: "emoji-travel-symbolic",
+        url: "https://hypr.land/news/26_lua/",
+        group: Group::Work,
+        parent: Some("Invoice"),
+    },
+    Page {
+        id: "settings",
+        title: "Settings",
+        icon: "applications-system-symbolic",
+        url: "https://hypr.land/news/26_lua/",
+        group: Group::Footer,
+        parent: None,
     },
 ];
 
