@@ -1,9 +1,151 @@
+use super::pages;
 use super::pages::{Group, Page, PAGES};
+use super::state::{CustomPage, Shared};
 use gtk::prelude::*;
 use gtk::{
-    Align, Box as GtkBox, Image, Label, ListBox, ListBoxRow, Orientation, Revealer,
-    RevealerTransitionType, SelectionMode, Separator, Stack,
+    glib, Align, Box as GtkBox, Button, Entry, Image, Label, ListBox, ListBoxRow, Orientation,
+    Revealer, RevealerTransitionType, SelectionMode, Separator, Stack, Window,
 };
+use std::rc::Rc;
+
+// ---------- custom (user-made) pages ----------
+
+fn fill_custom(list: &ListBox, stack: &Stack, state: &Shared) {
+    while let Some(c) = list.first_child() {
+        list.remove(&c);
+    }
+    let items = state.borrow().custom_pages.clone();
+    list.set_visible(!items.is_empty());
+
+    for cp in items {
+        let content = GtkBox::new(Orientation::Horizontal, 12);
+        content.set_margin_top(4);
+        content.set_margin_bottom(4);
+        content.set_margin_start(8);
+        content.append(&Image::from_icon_name("web-browser-symbolic"));
+        content.append(
+            &Label::builder()
+                .label(&cp.title)
+                .hexpand(true)
+                .xalign(0.0)
+                .build(),
+        );
+
+        let del = Button::builder()
+            .icon_name("user-trash-symbolic")
+            .css_classes(["flat"])
+            .tooltip_text("Delete page")
+            .build();
+        del.connect_clicked({
+            let (list, stack, state, id) =
+                (list.clone(), stack.clone(), state.clone(), cp.id.clone());
+            move |_| {
+                // Deferred: the rebuild destroys this button.
+                let (list, stack, state, id) =
+                    (list.clone(), stack.clone(), state.clone(), id.clone());
+                glib::idle_add_local_once(move || delete_custom(&list, &stack, &state, &id));
+            }
+        });
+        content.append(&del);
+
+        let row = ListBoxRow::new();
+        row.set_child(Some(&content));
+        row.set_widget_name(&cp.id);
+        list.append(&row);
+    }
+}
+
+fn delete_custom(list: &ListBox, stack: &Stack, state: &Shared, id: &str) {
+    state.borrow_mut().custom_pages.retain(|p| p.id != id);
+    if stack.visible_child_name().as_deref() == Some(id) {
+        stack.set_visible_child_name("home");
+    }
+    if let Some(child) = stack.child_by_name(id) {
+        stack.remove(&child);
+    }
+    super::state::save(&state.borrow());
+    fill_custom(list, stack, state);
+}
+
+fn add_custom(list: &ListBox, stack: &Stack, state: &Shared, title: String, url: String) {
+    let cp = CustomPage {
+        id: format!("custom-{}", glib::real_time()),
+        title,
+        url,
+    };
+    state.borrow_mut().custom_pages.push(cp.clone());
+    super::state::save(&state.borrow());
+    pages::add_custom_view(stack, &cp);
+    fill_custom(list, stack, state);
+    stack.set_visible_child_name(&cp.id);
+}
+
+/// Small modal dialog asking for a title and a URL.
+fn ask_new_page(from: &impl IsA<gtk::Widget>, on_ok: impl Fn(String, String) + 'static) {
+    let title = Entry::builder().placeholder_text("Title").build();
+    let url = Entry::builder()
+        .placeholder_text("https://example.com")
+        .build();
+    let cancel = Button::with_label("Cancel");
+    let create = Button::with_label("Create");
+    create.add_css_class("suggested-action");
+
+    let buttons = GtkBox::new(Orientation::Horizontal, 8);
+    buttons.set_halign(Align::End);
+    buttons.append(&cancel);
+    buttons.append(&create);
+
+    let body = GtkBox::new(Orientation::Vertical, 10);
+    body.append(&title);
+    body.append(&url);
+    body.append(&buttons);
+    body.set_margin_top(16);
+    body.set_margin_bottom(16);
+    body.set_margin_start(16);
+    body.set_margin_end(16);
+
+    let mut win = Window::builder()
+        .title("New page")
+        .modal(true)
+        .default_width(360)
+        .child(&body);
+    if let Some(parent) = from.root().and_then(|r| r.downcast::<Window>().ok()) {
+        win = win.transient_for(&parent);
+    }
+    let win = win.build();
+
+    let submit = Rc::new({
+        let (win, title, url) = (win.clone(), title.clone(), url.clone());
+        move || {
+            let mut u = url.text().trim().to_string();
+            if u.is_empty() {
+                return;
+            }
+            if !u.starts_with("http://") && !u.starts_with("https://") {
+                u = format!("https://{u}");
+            }
+            let t = title.text().trim().to_string();
+            let t = if t.is_empty() { u.clone() } else { t };
+            on_ok(t, u);
+            win.close();
+        }
+    });
+    create.connect_clicked({
+        let s = submit.clone();
+        move |_| s()
+    });
+    url.connect_activate({
+        let s = submit.clone();
+        move |_| s()
+    });
+    cancel.connect_clicked({
+        let w = win.clone();
+        move |_| w.close()
+    });
+    win.present();
+}
+
+// ---------- rows and lists ----------
 
 fn make_row(page: &Page) -> ListBoxRow {
     let content = GtkBox::new(Orientation::Horizontal, 12);
@@ -11,7 +153,7 @@ fn make_row(page: &Page) -> ListBoxRow {
     content.set_margin_bottom(8);
     content.set_margin_start(8);
     content.append(&Image::from_icon_name(page.icon));
-    content.append(&Label::new(Some(page.title)));
+    content.append(&Label::new(Some(page.title.trim())));
 
     let row = ListBoxRow::new();
     row.set_child(Some(&content));
@@ -111,9 +253,42 @@ fn select_by_name(lists: &[ListBox], name: &str) {
     }
 }
 
-pub fn build(stack: &Stack) -> Revealer {
+// ---------- sidebar filter (used by the header search, ">" mode) ----------
+
+/// Show only rows whose title contains `query`. Empty query restores the
+/// normal view (children collapsed, except a selected one).
+pub fn filter(root: &Revealer, query: &str) {
+    let q = query.trim().to_lowercase();
+    if let Some(child) = root.child() {
+        walk(&child, &q);
+    }
+}
+
+fn walk(w: &gtk::Widget, q: &str) {
+    if let Some(row) = w.downcast_ref::<ListBoxRow>() {
+        let name = row.widget_name();
+        if let Some(page) = PAGES.iter().find(|p| p.id == name.as_str()) {
+            let show = if q.is_empty() {
+                page.parent.is_none() || row.is_selected()
+            } else {
+                page.title.to_lowercase().contains(q)
+            };
+            row.set_visible(show);
+        }
+        return; // don't descend into the row's contents
+    }
+    let mut c = w.first_child();
+    while let Some(x) = c {
+        walk(&x, q);
+        c = x.next_sibling();
+    }
+}
+
+// ---------- the sidebar ----------
+
+pub fn build(stack: &Stack, state: &Shared) -> Revealer {
     let title = Label::builder()
-        .label("GTK Sidebar")
+        .label("Duck Finance Management")
         .halign(Align::Start)
         .margin_top(14)
         .margin_bottom(10)
@@ -126,26 +301,61 @@ pub fn build(stack: &Stack) -> Revealer {
     column.add_css_class("sidebar-col");
     column.append(&title);
 
-    // One list per group (footer is built separately, after the spacer).
+    // Built-in groups.
     let groups = [Group::Top, Group::Overview, Group::Work];
-    let mut lists: Vec<ListBox> = groups.iter().map(|g| make_list(*g)).collect();
+    let body_lists: Vec<ListBox> = groups.iter().map(|g| make_list(*g)).collect();
     let footer = make_list(Group::Footer);
+
+    // User-made pages.
+    let custom = ListBox::builder()
+        .selection_mode(SelectionMode::Single)
+        .css_classes(["navigation-sidebar"])
+        .build();
+    fill_custom(&custom, stack, state);
+
+    // Every list, so selection and syncing cover all of them.
+    let mut lists: Vec<ListBox> = body_lists.clone();
+    lists.push(custom.clone());
     lists.push(footer.clone());
 
-    let body: Vec<&ListBox> = lists.iter().filter(|l| *l != &footer).collect();
-
-    for (i, list) in body.iter().enumerate() {
+    // Built-in groups, with a line between each.
+    for (i, list) in body_lists.iter().enumerate() {
         if i > 0 {
-            column.append(&divider()); // line between groups
+            column.append(&divider());
         }
-        column.append(*list);
+        column.append(list);
     }
+
+    // Custom pages: the divider follows the list's visibility (hidden while empty).
+    let custom_div = divider();
+    custom
+        .bind_property("visible", &custom_div, "visible")
+        .sync_create()
+        .build();
+    column.append(&custom_div);
+    column.append(&custom);
+
+    let add = Button::builder()
+        .label("New page")
+        .icon_name("list-add-symbolic")
+        .css_classes(["flat"])
+        .margin_start(4)
+        .margin_end(4)
+        .build();
+    add.connect_clicked({
+        let (custom, stack, state) = (custom.clone(), stack.clone(), state.clone());
+        move |b| {
+            let (custom, stack, state) = (custom.clone(), stack.clone(), state.clone());
+            ask_new_page(b, move |t, u| add_custom(&custom, &stack, &state, t, u));
+        }
+    });
+    column.append(&add);
 
     // Spacer pushes the footer to the bottom.
     let spacer = GtkBox::new(Orientation::Vertical, 0);
     spacer.set_vexpand(true);
     column.append(&spacer);
-    column.append(&divider()); // line above the footer
+    column.append(&divider());
     column.append(&footer);
 
     // Selecting a row: open its page and clear selection in the other lists.
@@ -162,7 +372,7 @@ pub fn build(stack: &Stack) -> Revealer {
         });
     }
 
-    // Page changed from elsewhere (menu, restored state): follow it.
+    // Page changed from elsewhere (menu, search, restored state): follow it.
     stack.connect_visible_child_name_notify({
         let lists = lists.clone();
         move |stack| {

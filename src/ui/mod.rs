@@ -4,6 +4,7 @@ mod header;
 mod menu;
 mod notifications;
 mod pages;
+pub mod search;
 mod settings;
 mod sidebar;
 pub mod state;

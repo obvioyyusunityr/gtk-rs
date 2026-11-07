@@ -2,6 +2,7 @@
 // single source truth: the sidebar rows and the stack pages are both
 // ge from this table in this order
 use super::settings;
+use super::state::CustomPage;
 use super::state::Shared;
 use gtk::prelude::*;
 use gtk::{Stack, StackTransitionType};
@@ -10,6 +11,10 @@ use webkit6::prelude::*;
 use webkit6::WebView;
 
 use super::webview;
+
+pub fn add_custom_view(stack: &Stack, cp: &CustomPage) {
+    stack.add_titled(&webview::build(&cp.url), Some(&cp.id), &cp.title);
+}
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum Group {
@@ -139,7 +144,7 @@ pub const PAGES: &[Page] = &[
         icon: "emoji-travel-symbolic",
         url: "https://hypr.land/news/26_lua/",
         group: Group::Work,
-        parent: Some("Invoice"),
+        parent: Some("business"),
     },
     Page {
         id: "settings",
@@ -188,6 +193,11 @@ pub fn build(state: &Shared) -> Stack {
             return;
         }
     });
+
+    for cp in state.borrow().custom_pages.iter() {
+        add_custom_view(&stack, cp);
+    }
+
     stack
 }
 

@@ -3,7 +3,7 @@ use super::state;
 use super::{header, menu, pages, sidebar, style};
 use gtk::glib;
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, Separator};
+use gtk::{gio, Application, ApplicationWindow, Box as GtkBox, Orientation, Separator};
 use gtk::{EventControllerMotion, PropagationPhase, Revealer, RevealerTransitionType};
 use std::{cell::Cell, rc::Rc};
 
@@ -13,7 +13,7 @@ pub fn build(app: &Application) {
 
     let state = state::load();
     let stack = pages::build(&state);
-    let revealer = sidebar::build(&stack);
+    let revealer = sidebar::build(&stack, &state);
     let header = header::build(&revealer, &stack, &state);
     header.notifications.push("Welcome to Duck Finance");
     header.notifications.push("Welcome to Duck Finance");
@@ -73,11 +73,11 @@ pub fn build(app: &Application) {
         stack.set_visible_child_name(&page);
     }
     window.connect_close_request({
-        let (state, stack, toggle, bar) = (
+        let (state, stack, toggle) = (
             state.clone(),
             stack.clone(),
             header.toggle.clone(),
-            header.bar.clone(),
+            //header.bar.clone(),
         );
         move |win| {
             let mut s = state.borrow_mut();
@@ -127,6 +127,18 @@ pub fn build(app: &Application) {
             });
         }
     });
+    let focus_search = gio::ActionEntry::builder("focus-search")
+        .activate({
+            let (search, header_rev) = (header.search.clone(), header_rev.clone());
+            move |_app: &Application, _, _| {
+                header_rev.set_reveal_child(true);
+                search.grab_focus();
+            }
+        })
+        .build();
+    app.add_action_entries([focus_search]);
+    app.set_accels_for_action("app.focus-search", &["<Ctrl>k", "<Ctrl>f"]);
+
     header_rev.add_controller(leave);
     let manager = adw::StyleManager::default();
     let apply = {

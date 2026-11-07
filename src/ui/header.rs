@@ -95,9 +95,11 @@ pub fn build(revealer: &Revealer, stack: &Stack, state: &Shared) -> Header {
 
     // Search entry.
     let search = SearchEntry::builder()
-        .placeholder_text("Search")
+        .placeholder_text("Search ( >page  @data )")
         .width_request(300)
         .build();
+
+    super::search::install(&search, stack, revealer);
 
     search.connect_search_changed(|entry| {
         let query = entry.text();

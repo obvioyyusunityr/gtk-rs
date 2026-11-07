@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
 pub type Shared = Rc<RefCell<State>>;
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)] // missing fields (older files) fall back to defaults
 pub struct State {
+    pub custom_pages: Vec<CustomPage>,
     pub width: i32,
     pub height: i32,
     pub maximized: bool,
@@ -33,6 +35,7 @@ impl Default for State {
             zoom: 1.0,
             accounts: Vec::new(),
             account: None,
+            custom_pages: Vec::new(),
         }
     }
 }
@@ -59,4 +62,11 @@ pub fn save(state: &State) {
     if let Ok(json) = serde_json::to_string_pretty(state) {
         let _ = fs::write(p, json);
     }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CustomPage {
+    pub id: String,
+    pub title: String,
+    pub url: String,
 }

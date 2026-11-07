@@ -19,22 +19,17 @@ fn to_uri(s: &str) -> String {
 }
 
 /// Create a WebView that fills its parent, with the inspector enabled.
-pub fn build(url: &'static str) -> WebView {
+pub fn build(url: &str) -> WebView {
     let webview = WebView::new();
     enable_inspector(&webview);
     webview.set_hexpand(true);
     webview.set_vexpand(true);
 
+    let url = url.to_string();
     let loaded = Cell::new(false);
     webview.connect_map(move |webview| {
         if !loaded.replace(true) {
-            webview.load_uri(&to_uri(url));
-        }
-    });
-
-    webview.connect_load_changed(|wv, event| {
-        if event == webkit6::LoadEvent::Finished {
-            apply_dark(wv);
+            webview.load_uri(&url);
         }
     });
 
